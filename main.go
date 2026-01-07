@@ -1,80 +1,111 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
-func createServer() *http.Server {
-	mux:= http.NewServeMux()
+func main() {
+	l := LoggerAdapter(LogOutput)
+	ds := NewSimpleDataStore()
+	logic := NewSimpleLogic(l, ds)
+	c := NewController(l, logic)
+	http.HandleFunc("/hello", c.SayHello)
+	http.ListenAndServe(":8080", nil)
+}
 
-	mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Slow request started...")
-		time.Sleep(8 * time.Second)
-		fmt.Fprintf(w, "Slow request completed at %v\n", time.Now())
-	})
+func LogOutput(message string){
+	fmt.Println(message)
+}
 
-	return &http.Server{
-		Addr: ":8080",
-		Handler: mux,
+type Logger interface{
+	Log(message string)
+}
+
+type LoggerAdapter func(message string)
+
+func (lg LoggerAdapter) Log(message string){
+	lg(message)
+}
+
+type SimpleDataStore struct{
+	userData map[string]string
+}
+
+func (sds SimpleDataStore) UserNameForID (userID string) (string, bool){
+	name, ok := sds.userData[userID]
+	return name, ok
+}
+
+func NewSimpleDataStore() SimpleDataStore{
+	return SimpleDataStore{
+		userData: map[string]string{
+			"1" : "Max",
+			"2" : "Anny",
+			"3" : "Shelly",
+		},
 	}
 }
 
-func runServer(
-	ctx context.Context,
-	server *http.Server,
-	shutdownTimeout time.Duration,
-)error{
-	serverErr := make(chan error, 1)
-	go func(){
-		log.Println("Starting server...")
-		if err := server.ListenAndServe(); !errors.Is(   //!errors.Is means not error if it is http.ErrServerClosed
-			err, http.ErrServerClosed,
-		){
-			serverErr <- err
-		}
-		close(serverErr)
-	}()
-	
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
-	select{
-	case err := <-serverErr:
-		return err
-	case <-stop:
-		log.Println("Server is shutting down...")
-	case <-ctx.Done():
-		log.Println("Context canceled")
-	}
-
-	shutdownCtx, cancel := context.WithTimeout(
-		context.Background(),
-		shutdownTimeout,
-	)
-	defer cancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil{
-		if closeErr := server.Close(); closeErr != nil{
-			return errors.Join(err, closeErr)
-		}
-		return err
-	}
-	log.Println("Server exited gracefully")
-	return nil
+type DataStore interface{
+	UserNameForID(userID string) (string, bool)
 }
 
-func main(){
-	server := createServer()
+type SimpleLogic struct{
+	l Logger
+	ds DataStore
+}
 
-	if err := runServer(context.Background(), server, 3*time.Second); err != nil{
-		log.Fatalf("Server error: %v", err)
+func (sl SimpleLogic) SayHello(userID string) (string, error){
+	sl.l.Log("in SayHello for " + userID)
+	name, ok := sl.ds.UserNameForID(userID)
+	if !ok{
+		return "", errors.New("unknow user")
+	}
+	return "Hello " + name, nil
+}
+
+func (sl SimpleLogic) SayGoodBye(userID string) (string, error){
+	sl.l.Log("in SayGoodBye for " + userID)
+	name, ok := sl.ds.UserNameForID(userID)
+	if !ok{
+		return "", errors.New("unknow user")
+	}
+	return "GoodBye " + name, nil
+}
+
+func NewSimpleLogic(l Logger, ds DataStore) SimpleLogic{
+	return SimpleLogic{
+		l: l,
+		ds: ds,
+	}
+}
+
+type Logic interface{
+	SayHello(userID string) (string, error)
+}
+
+type Controller struct{
+	l Logger
+	logic Logic
+}
+
+func (c Controller) SayHello(w http.ResponseWriter, r *http.Request){
+	c.l.Log("In SayHello")
+	userID := r.URL.Query().Get("user_id")
+	message, err := c.logic.SayHello(userID)
+	if err!=nil{
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write([]byte(message))
+}
+
+func NewController(l Logger, logic Logic) Controller{
+	return Controller{
+		l: l,
+		logic: logic,
 	}
 }
