@@ -1,111 +1,35 @@
 package main
 
-import (
-	"errors"
-	"fmt"
-	"net/http"
-)
-
 func main() {
-	l := LoggerAdapter(LogOutput)
-	ds := NewSimpleDataStore()
-	logic := NewSimpleLogic(l, ds)
-	c := NewController(l, logic)
-	http.HandleFunc("/hello", c.SayHello)
-	http.ListenAndServe(":8080", nil)
+	var it *Three
+	it = it.Insert(OrderableInt(5))
 }
 
-func LogOutput(message string){
-	fmt.Println(message)
+type Orderable interface{
+	Order (any) int
 }
 
-type Logger interface{
-	Log(message string)
+type OrderableInt int
+
+func (oi OrderableInt) Order(val any) int{
+	return int(oi - val.(OrderableInt))
 }
 
-type LoggerAdapter func(message string)
-
-func (lg LoggerAdapter) Log(message string){
-	lg(message)
+type Three struct{
+	val Orderable
+	left, right *Three
 }
 
-type SimpleDataStore struct{
-	userData map[string]string
-}
-
-func (sds SimpleDataStore) UserNameForID (userID string) (string, bool){
-	name, ok := sds.userData[userID]
-	return name, ok
-}
-
-func NewSimpleDataStore() SimpleDataStore{
-	return SimpleDataStore{
-		userData: map[string]string{
-			"1" : "Max",
-			"2" : "Anny",
-			"3" : "Shelly",
-		},
+func (t *Three) Insert(val Orderable) *Three{
+	if t == nil{
+		return &Three{val: val}
 	}
-}
-
-type DataStore interface{
-	UserNameForID(userID string) (string, bool)
-}
-
-type SimpleLogic struct{
-	l Logger
-	ds DataStore
-}
-
-func (sl SimpleLogic) SayHello(userID string) (string, error){
-	sl.l.Log("in SayHello for " + userID)
-	name, ok := sl.ds.UserNameForID(userID)
-	if !ok{
-		return "", errors.New("unknow user")
+	
+	switch comp := val.Order(t.val); {
+		case comp < 0:
+		t.left = t.left.Insert(val)
+		case comp > 0:
+		t.right = t.left.right.Insert(val)
 	}
-	return "Hello " + name, nil
-}
-
-func (sl SimpleLogic) SayGoodBye(userID string) (string, error){
-	sl.l.Log("in SayGoodBye for " + userID)
-	name, ok := sl.ds.UserNameForID(userID)
-	if !ok{
-		return "", errors.New("unknow user")
-	}
-	return "GoodBye " + name, nil
-}
-
-func NewSimpleLogic(l Logger, ds DataStore) SimpleLogic{
-	return SimpleLogic{
-		l: l,
-		ds: ds,
-	}
-}
-
-type Logic interface{
-	SayHello(userID string) (string, error)
-}
-
-type Controller struct{
-	l Logger
-	logic Logic
-}
-
-func (c Controller) SayHello(w http.ResponseWriter, r *http.Request){
-	c.l.Log("In SayHello")
-	userID := r.URL.Query().Get("user_id")
-	message, err := c.logic.SayHello(userID)
-	if err!=nil{
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write([]byte(message))
-}
-
-func NewController(l Logger, logic Logic) Controller{
-	return Controller{
-		l: l,
-		logic: logic,
-	}
+	return t
 }
