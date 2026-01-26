@@ -2,38 +2,59 @@ package main
 
 import "fmt"
 
-func main() {
-	words := []string{"Max", "Anny", "Shelly", "Finike"}
-	filtered := Filter(words, func(s string) bool {
-		return s != "Max"
-	})
-	fmt.Println(filtered)
+// Node
+type Node struct{
+	Key int
+	Left, Right *Node
 }
 
-
-func Map[T1, T2 any](s []T1, f func(T1)T2) []T2{
-	r := make([]T2, len(s))
-	for i, v := range s {
-		r[i] = f(v)
-	}
-	return r
-}
-
-func Filter[T any](s []T, f func(T)bool) []T{
-	var r []T
-	for _, v := range s{
-		if f(v){
-			r = append(r, v)
+// Insert
+func (n *Node) Insert(k int){
+	if n.Key < k{
+		// move Right
+		if n.Right == nil{
+			n.Right = &Node{Key: k}
+		} else {
+			n.Right.Insert(k)
+		}
+	} else if n.Key > k {
+		// move left 
+		if n.Left == nil{
+			n.Left = &Node{Key: k}
+		} else {
+			n.Left.Insert(k)
 		}
 	}
-	return r
 }
 
-func Reduce[T1, T2 any](s []T1, initializer T2, f func(T2, T1)T2)T2{
-	r := initializer
-	for _, v := range s{
-		r = f(r, v)
+// Search
+func (n *Node) Search(k int) bool{
+	if n == nil{
+		return false
 	}
-	return r
+	if n.Key <k {
+		// move right 
+		return n.Right.Search(k)
+	} else if n.Key >k {
+		// move left 
+		return n.Left.Search(k)
+	}
+	
+	return  true
+}
+
+func main() {
+	tree := Node{Key:100}
+	tree.Insert(50)
+	tree.Insert(30)
+	tree.Insert(450)
+	tree.Insert(12)
+	tree.Insert(33)
+	tree.Insert(22)
+	tree.Insert(56)
+	tree.Insert(78)
+	fmt.Println(tree)
+	
+	fmt.Println(tree.Search(78))
 }
 
