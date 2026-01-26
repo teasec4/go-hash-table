@@ -1,35 +1,39 @@
 package main
 
+import "fmt"
+
 func main() {
-	var it *Three
-	it = it.Insert(OrderableInt(5))
+	words := []string{"Max", "Anny", "Shelly", "Finike"}
+	filtered := Filter(words, func(s string) bool {
+		return s != "Max"
+	})
+	fmt.Println(filtered)
 }
 
-type Orderable interface{
-	Order (any) int
-}
 
-type OrderableInt int
-
-func (oi OrderableInt) Order(val any) int{
-	return int(oi - val.(OrderableInt))
-}
-
-type Three struct{
-	val Orderable
-	left, right *Three
-}
-
-func (t *Three) Insert(val Orderable) *Three{
-	if t == nil{
-		return &Three{val: val}
+func Map[T1, T2 any](s []T1, f func(T1)T2) []T2{
+	r := make([]T2, len(s))
+	for i, v := range s {
+		r[i] = f(v)
 	}
-	
-	switch comp := val.Order(t.val); {
-		case comp < 0:
-		t.left = t.left.Insert(val)
-		case comp > 0:
-		t.right = t.left.right.Insert(val)
-	}
-	return t
+	return r
 }
+
+func Filter[T any](s []T, f func(T)bool) []T{
+	var r []T
+	for _, v := range s{
+		if f(v){
+			r = append(r, v)
+		}
+	}
+	return r
+}
+
+func Reduce[T1, T2 any](s []T1, initializer T2, f func(T2, T1)T2)T2{
+	r := initializer
+	for _, v := range s{
+		r = f(r, v)
+	}
+	return r
+}
+
