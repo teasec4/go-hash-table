@@ -1,60 +1,70 @@
 package main
 
-import "fmt"
+import (
+	"cmp"
+	"fmt"
+)
+
+type OrderableFunc[T any] func(t1, t2 T) int
 
 // Node
-type Node struct{
-	Key int
-	Left, Right *Node
+type Node[T any] struct{
+	val T
+	left, right *Node[T]
 }
 
-// Insert
-func (n *Node) Insert(k int){
-	if n.Key < k{
-		// move Right
-		if n.Right == nil{
-			n.Right = &Node{Key: k}
-		} else {
-			n.Right.Insert(k)
-		}
-	} else if n.Key > k {
-		// move left 
-		if n.Left == nil{
-			n.Left = &Node{Key: k}
-		} else {
-			n.Left.Insert(k)
-		}
+type Tree[T any] struct{
+	f OrderableFunc[T]
+	root *Node[T]
+}
+
+func NewTree[T any](f OrderableFunc[T]) *Tree[T]{
+	return &Tree[T]{
+		f: f,
 	}
 }
 
-// Search
-func (n *Node) Search(k int) bool{
+func (t *Tree[T]) Add(v T){
+	t.root = t.root.Add(t.f, v)
+}
+
+func (t *Tree[T]) Contains(v T) bool{
+	return t.root.Contains(t.f, v)
+}
+
+func (n *Node[T]) Add(f OrderableFunc[T], v T) *Node[T]{
+	if n == nil{
+		return &Node[T]{val: v}
+	}
+	switch r := f(v, n.val);{
+		case r <= -1:
+		n.left = n.left.Add(f, v)
+		case r >= 1:
+		n.right = n.right.Add(f, v)
+	}
+	return n
+}
+
+func (n *Node[T]) Contains(f OrderableFunc[T], v T) bool{
 	if n == nil{
 		return false
 	}
-	if n.Key <k {
-		// move right 
-		return n.Right.Search(k)
-	} else if n.Key >k {
-		// move left 
-		return n.Left.Search(k)
+	switch r:= f(v, n.val);{
+		case r<= -1:
+		return n.left.Contains(f, v)
+		case r >= 1:
+		return n.right.Contains(f, v)
 	}
-	
-	return  true
+	return true
 }
 
 func main() {
-	tree := Node{Key:100}
-	tree.Insert(50)
-	tree.Insert(30)
-	tree.Insert(450)
-	tree.Insert(12)
-	tree.Insert(33)
-	tree.Insert(22)
-	tree.Insert(56)
-	tree.Insert(78)
-	fmt.Println(tree)
+	t1 := NewTree(cmp.Compare[int])
+	t1.Add(10)
+	t1.Add(15)
+	t1.Add(8)
 	
-	fmt.Println(tree.Search(78))
+	fmt.Println(t1.Contains(15))
+	fmt.Println(t1.Contains(20))
 }
 
